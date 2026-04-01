@@ -1,4 +1,4 @@
-       // Модель задачи
+   // Модель задачи
 class Task {
     constructor(id, title, description, category, priority, deadline, completed = false) {
         this.id = id;
@@ -23,6 +23,11 @@ class TaskManager {
         this.tasks.push(task);
         this.saveToLocalStorage();
         return task;
+    }
+    
+    addTasks(tasks) {
+        tasks.forEach(task => this.tasks.push(task));
+        this.saveToLocalStorage();
     }
     
     updateTask(id, updatedData) {
@@ -66,6 +71,23 @@ class TaskManager {
         const highPriority = this.tasks.filter(t => t.priority === 'high' && !t.completed).length;
         
         return { total, completed, pending, highPriority };
+    }
+    
+    exportTasks() {
+        return JSON.stringify(this.tasks, null, 2);
+    }
+    
+    importTasks(jsonData) {
+        try {
+            const tasks = JSON.parse(jsonData);
+            if (Array.isArray(tasks)) {
+                this.addTasks(tasks);
+                return true;
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
     }
     
     saveToLocalStorage() {
@@ -153,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupThemeToggle();
     setupClearAllButton();
+    setupExportImport();
     showNotification('Добро пожаловать в Task Manager!', 'info');
 });
 
@@ -160,13 +183,64 @@ function setupEventListeners() {
     document.getElementById('add-task-btn').addEventListener('click', openAddModal);
     document.querySelector('.close-btn').addEventListener('click', closeModal);
     document.getElementById('task-form').addEventListener('submit', handleTaskSubmit);
-    document.getElementById('search-input').addEventListener('input', filterTasks);
-    document.getElementById('status-filter').addEventListener('change', filterTasks);
-    document.getElementById('category-filter').addEventListener('change', filterTasks);
-    document.getElementById('priority-filter').addEventListener('change', filterTasks);
+    document.getElementById('search-input').addEventListener('input', filterAndRender);
+    document.getElementById('status-filter').addEventListener('change', filterAndRender);
+    document.getElementById('category-filter').addEventListener('change', filterAndRender);
+    document.getElementById('priority-filter').addEventListener('change', filterAndRender);
+    document.getElementById('sort-by').addEventListener('change', filterAndRender);
+    document.getElementById('sort-order').addEventListener('change', filterAndRender);
     window.addEventListener('click', (e) => {
         if (e.target === document.getElementById('task-modal')) closeModal();
     });
+}
+
+function setupExportImport() {
+    const exportBtn = document.getElementById('export-btn');
+    const importBtn = document.getElementById('import-btn');
+    const importFile = document.getElementById('import-file');
+    
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const data = taskManager.exportTasks();
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tasks_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification(`✅ Экспортировано ${taskManager.getTasks().length} задач`, 'success');
+        });
+    }
+    
+    if (importBtn && importFile) {
+        importBtn.addEventListener('click', () => {
+            importFile.click();
+        });
+        
+        importFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const success = taskManager.importTasks(event.target.result);
+                if (success) {
+                    renderTasks();
+                    updateStats();
+                    showNotification('✅ Задачи импортированы', 'success');
+                } else {
+                    showNotification('❌ Ошибка импорта. Неверный формат файла', 'error');
+                }
+            };
+            reader.readAsText(file);
+            importFile.value = '';
+        });
+    }
+}
+
+function filterAndRender() {
+    renderTasks();
 }
 
 function setupClearAllButton() {
@@ -248,6 +322,75 @@ function handleTaskSubmit(e) {
     updateStats();
 }
 
+function sortTasks(tasks) {
+    const sortBy = document.getElementById('sort-by').value;
+    const sortOrder = document.getElementById('sort-order').value;
+    
+    const sorted = [...tasks];
+    
+    switch(sortBy) {
+        case 'date':
+            sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            break;
+        case 'priority':
+            const priorityOrder = { high: 1, medium: 2, low: 3 };
+            sorted.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+            break;
+        case 'title':
+            sorted.sort((a, b) => a.title.localeCompare(b.title));
+            break;
+        case 'deadline':
+            sorted.sort((a, b) => {
+                if (!a.deadline && !b.deadline) return 0;
+                if (!a.deadline) return 1;
+                if (!b.deadline) return -1;
+                return new Date(a.deadline) - new Date(b.deadline);
+            });
+            break;
+        default:
+            sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
+    
+    if (sortOrder === 'desc') {
+        sorted.reverse();
+    }
+    
+    return sorted;
+}
+
+function getFilteredTasks() {
+    let tasks = taskManager.getTasks();
+    
+    const statusFilter = document.getElementById('status-filter').value;
+    if (statusFilter === 'active') {
+        tasks = tasks.filter(t => !t.completed);
+    } else if (statusFilter === 'completed') {
+        tasks = tasks.filter(t => t.completed);
+    }
+    
+    const categoryFilter = document.getElementById('category-filter').value;
+    if (categoryFilter !== 'all') {
+        tasks = tasks.filter(t => t.category === categoryFilter);
+    }
+    
+    const priorityFilter = document.getElementById('priority-filter').value;
+    if (priorityFilter !== 'all') {
+        tasks = tasks.filter(t => t.priority === priorityFilter);
+    }
+    
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    if (searchTerm) {
+        tasks = tasks.filter(t => 
+            t.title.toLowerCase().includes(searchTerm) ||
+            (t.description && t.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    tasks = sortTasks(tasks);
+    
+    return tasks;
+}
+
 function renderTasks() {
     const tasks = getFilteredTasks();
     const container = document.getElementById('tasks-list');
@@ -280,45 +423,6 @@ function renderTasks() {
             </div>
         </div>
     `).join('');
-}
-
-function getFilteredTasks() {
-    let tasks = taskManager.getTasks();
-    
-    // Фильтр по статусу
-    const statusFilter = document.getElementById('status-filter').value;
-    if (statusFilter === 'active') {
-        tasks = tasks.filter(t => !t.completed);
-    } else if (statusFilter === 'completed') {
-        tasks = tasks.filter(t => t.completed);
-    }
-    
-    // Фильтр по категории
-    const categoryFilter = document.getElementById('category-filter').value;
-    if (categoryFilter !== 'all') {
-        tasks = tasks.filter(t => t.category === categoryFilter);
-    }
-    
-    // Фильтр по приоритету
-    const priorityFilter = document.getElementById('priority-filter').value;
-    if (priorityFilter !== 'all') {
-        tasks = tasks.filter(t => t.priority === priorityFilter);
-    }
-    
-    // Поиск
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    if (searchTerm) {
-        tasks = tasks.filter(t => 
-            t.title.toLowerCase().includes(searchTerm) ||
-            (t.description && t.description.toLowerCase().includes(searchTerm))
-        );
-    }
-    
-    return tasks;
-}
-
-function filterTasks() {
-    renderTasks();
 }
 
 function toggleComplete(id) {
