@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Task Manager</h1>
+            <button id="theme-toggle" class="theme-btn">🌙</button>
+        </div>
+        
+        <div class="add-task-section">
+            <button id="add-task-btn" class="btn-primary">➕ Новая задача</button>
+        </div>
+        
+        <div class="stats-section">
+            <h2>Статистика</h2>
+            <div id="stats-container" class="stats-grid"></div>
+        </div>
+        
+        <div class="filters-section">
+            <input type="text" id="search-input" placeholder="🔍 Поиск задач...">
+            <select id="category-filter">
+                <option value="all">Все категории</option>
+                <option value="work">Работа</option>
+                <option value="personal">Личное</option>
+                <option value="study">Учеба</option>
+            </select>
+            <select id="priority-filter">
+                <option value="all">Все приоритеты</option>
+                <option value="high">Высокий</option>
+                <option value="medium">Средний</option>
+                <option value="low">Низкий</option>
+            </select>
+        </div>
+        
+        <h2>Мои задачи</h2>
+        <div id="tasks-list" class="tasks-list"></div>
+    </div>
+    
+    <div id="task-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modal-title">Добавить задачу</h2>
+            <form id="task-form">
+                <input type="text" id="task-title" placeholder="Название задачи" required>
+                <textarea id="task-desc" placeholder="Описание"></textarea>
+                <select id="task-category">
+                    <option value="work">Работа</option>
+                    <option value="personal">Личное</option>
+                    <option value="study">Учеба</option>
+                </select>
+                <select id="task-priority">
+                    <option value="high">🔴 Высокий</option>
+                    <option value="medium">🟡 Средний</option>
+                    <option value="low">🟢 Низкий</option>
+                </select>
+                <input type="date" id="task-deadline">
+                <button type="submit">Сохранить</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
