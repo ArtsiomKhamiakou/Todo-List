@@ -75,6 +75,67 @@ class TaskManager {
     }
 }
 
+// Функция уведомлений
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    
+    const colors = {
+        success: '#10b981',
+        error: '#ef4444',
+        info: '#3b82f6',
+        warning: '#f59e0b'
+    };
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        background: ${colors[type] || colors.success};
+        color: white;
+        border-radius: 8px;
+        font-weight: bold;
+        z-index: 2000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Добавляем анимации для уведомлений
+const notificationStyles = document.createElement('style');
+notificationStyles.textContent = `
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(notificationStyles);
+
 // Инициализация
 const taskManager = new TaskManager();
 
@@ -86,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStats();
     setupEventListeners();
     setupThemeToggle();
+    showNotification('Добро пожаловать в Task Manager!', 'info');
 });
 
 function setupEventListeners() {
@@ -138,12 +200,13 @@ function handleTaskSubmit(e) {
     };
     
     if (!taskData.title.trim()) {
-        alert('Введите название задачи');
+        showNotification('Введите название задачи', 'error');
         return;
     }
     
     if (currentEditId) {
         taskManager.updateTask(currentEditId, taskData);
+        showNotification('✅ Задача обновлена', 'success');
     } else {
         const newTask = new Task(
             Date.now(),
@@ -154,6 +217,7 @@ function handleTaskSubmit(e) {
             taskData.deadline
         );
         taskManager.addTask(newTask);
+        showNotification('✅ Задача добавлена', 'success');
     }
     
     closeModal();
@@ -195,7 +259,11 @@ function renderTasks() {
 }
 
 function toggleComplete(id) {
-    taskManager.toggleComplete(id);
+    const task = taskManager.toggleComplete(id);
+    if (task) {
+        const message = task.completed ? '✅ Задача выполнена!' : '↩️ Задача возвращена в работу';
+        showNotification(message, 'success');
+    }
     renderTasks();
     updateStats();
 }
@@ -205,6 +273,7 @@ function deleteTask(id) {
         taskManager.deleteTask(id);
         renderTasks();
         updateStats();
+        showNotification('🗑️ Задача удалена', 'info');
     }
 }
 
@@ -299,6 +368,7 @@ function setupThemeToggle() {
         const isDark = document.body.classList.contains('dark');
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
         themeBtn.textContent = isDark ? '☀️' : '🌙';
+        showNotification(isDark ? '🌙 Тёмная тема включена' : '☀️ Светлая тема включена', 'info');
     };
 }
 
