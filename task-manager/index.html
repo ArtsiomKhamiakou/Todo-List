@@ -1,4 +1,4 @@
-// Модель задачи
+       // Модель задачи
 class Task {
     constructor(id, title, description, category, priority, deadline, completed = false) {
         this.id = id;
@@ -161,6 +161,7 @@ function setupEventListeners() {
     document.querySelector('.close-btn').addEventListener('click', closeModal);
     document.getElementById('task-form').addEventListener('submit', handleTaskSubmit);
     document.getElementById('search-input').addEventListener('input', filterTasks);
+    document.getElementById('status-filter').addEventListener('change', filterTasks);
     document.getElementById('category-filter').addEventListener('change', filterTasks);
     document.getElementById('priority-filter').addEventListener('change', filterTasks);
     window.addEventListener('click', (e) => {
@@ -248,7 +249,7 @@ function handleTaskSubmit(e) {
 }
 
 function renderTasks() {
-    const tasks = taskManager.getTasks();
+    const tasks = getFilteredTasks();
     const container = document.getElementById('tasks-list');
     
     if (tasks.length === 0) {
@@ -267,6 +268,7 @@ function renderTasks() {
                     <span>📁 ${getCategoryName(task.category)}</span>
                     <span class="priority-${task.priority}">${getPriorityIcon(task.priority)} ${getPriorityName(task.priority)}</span>
                     ${task.deadline ? `<span>📅 ${task.deadline}</span>` : ''}
+                    <span>${task.completed ? '✅ Выполнено' : '🟡 В работе'}</span>
                 </div>
             </div>
             <div class="task-actions">
@@ -278,6 +280,45 @@ function renderTasks() {
             </div>
         </div>
     `).join('');
+}
+
+function getFilteredTasks() {
+    let tasks = taskManager.getTasks();
+    
+    // Фильтр по статусу
+    const statusFilter = document.getElementById('status-filter').value;
+    if (statusFilter === 'active') {
+        tasks = tasks.filter(t => !t.completed);
+    } else if (statusFilter === 'completed') {
+        tasks = tasks.filter(t => t.completed);
+    }
+    
+    // Фильтр по категории
+    const categoryFilter = document.getElementById('category-filter').value;
+    if (categoryFilter !== 'all') {
+        tasks = tasks.filter(t => t.category === categoryFilter);
+    }
+    
+    // Фильтр по приоритету
+    const priorityFilter = document.getElementById('priority-filter').value;
+    if (priorityFilter !== 'all') {
+        tasks = tasks.filter(t => t.priority === priorityFilter);
+    }
+    
+    // Поиск
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    if (searchTerm) {
+        tasks = tasks.filter(t => 
+            t.title.toLowerCase().includes(searchTerm) ||
+            (t.description && t.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    return tasks;
+}
+
+function filterTasks() {
+    renderTasks();
 }
 
 function toggleComplete(id) {
@@ -321,59 +362,6 @@ function updateStats() {
             <div class="stat-label">Высокий приоритет</div>
         </div>
     `;
-}
-
-function filterTasks() {
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const categoryFilter = document.getElementById('category-filter').value;
-    const priorityFilter = document.getElementById('priority-filter').value;
-    
-    let filtered = taskManager.getTasks();
-    
-    if (searchTerm) {
-        filtered = filtered.filter(t => 
-            t.title.toLowerCase().includes(searchTerm) ||
-            (t.description && t.description.toLowerCase().includes(searchTerm))
-        );
-    }
-    
-    if (categoryFilter !== 'all') {
-        filtered = filtered.filter(t => t.category === categoryFilter);
-    }
-    
-    if (priorityFilter !== 'all') {
-        filtered = filtered.filter(t => t.priority === priorityFilter);
-    }
-    
-    const container = document.getElementById('tasks-list');
-    
-    if (filtered.length === 0) {
-        container.innerHTML = '<p style="color: white; text-align: center; padding: 2rem;">🔍 Ничего не найдено</p>';
-        return;
-    }
-    
-    container.innerHTML = filtered.map(task => `
-        <div class="task-card">
-            <div class="task-info">
-                <div class="task-title ${task.completed ? 'completed' : ''}">
-                    ${escapeHtml(task.title)}
-                </div>
-                ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
-                <div class="task-meta">
-                    <span>📁 ${getCategoryName(task.category)}</span>
-                    <span class="priority-${task.priority}">${getPriorityIcon(task.priority)} ${getPriorityName(task.priority)}</span>
-                    ${task.deadline ? `<span>📅 ${task.deadline}</span>` : ''}
-                </div>
-            </div>
-            <div class="task-actions">
-                <button class="complete-btn" onclick="toggleComplete(${task.id})">
-                    ${task.completed ? '↩️ Вернуть' : '✅ Выполнить'}
-                </button>
-                <button class="edit-btn" onclick="openEditModal(${task.id})">✏️</button>
-                <button class="delete-btn" onclick="deleteTask(${task.id})">🗑️</button>
-            </div>
-        </div>
-    `).join('');
 }
 
 function setupThemeToggle() {
