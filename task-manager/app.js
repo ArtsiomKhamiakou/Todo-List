@@ -40,6 +40,11 @@ class TaskManager {
         this.saveToLocalStorage();
     }
     
+    deleteAllTasks() {
+        this.tasks = [];
+        this.saveToLocalStorage();
+    }
+    
     toggleComplete(id) {
         const task = this.tasks.find(t => t.id == id);
         if (task) {
@@ -147,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStats();
     setupEventListeners();
     setupThemeToggle();
+    setupClearAllButton();
     showNotification('Добро пожаловать в Task Manager!', 'info');
 });
 
@@ -154,11 +160,34 @@ function setupEventListeners() {
     document.getElementById('add-task-btn').addEventListener('click', openAddModal);
     document.querySelector('.close-btn').addEventListener('click', closeModal);
     document.getElementById('task-form').addEventListener('submit', handleTaskSubmit);
-    document.getElementById('search-input').addEventListener('input', filterTasks);
-    document.getElementById('category-filter').addEventListener('change', filterTasks);
-    document.getElementById('priority-filter').addEventListener('change', filterTasks);
+    document.getElementById('search-input').addEventListener('input', filterAndRender);
+    document.getElementById('status-filter').addEventListener('change', filterAndRender);
+    document.getElementById('category-filter').addEventListener('change', filterAndRender);
+    document.getElementById('priority-filter').addEventListener('change', filterAndRender);
+    document.getElementById('sort-by').addEventListener('change', filterAndRender);
+    document.getElementById('sort-order').addEventListener('change', filterAndRender);
     window.addEventListener('click', (e) => {
         if (e.target === document.getElementById('task-modal')) closeModal();
+    });
+}
+
+function filterAndRender() {
+    renderTasks();
+}
+
+function setupClearAllButton() {
+    const clearBtn = document.getElementById('clear-all-btn');
+    if (!clearBtn) return;
+    
+    clearBtn.addEventListener('click', () => {
+        const confirmed = confirm('⚠️ ВНИМАНИЕ! Вы уверены, что хотите удалить ВСЕ задачи?\n\nЭто действие нельзя отменить!');
+        
+        if (confirmed) {
+            taskManager.deleteAllTasks();
+            renderTasks();
+            updateStats();
+            showNotification('✅ Все задачи удалены', 'success');
+        }
     });
 }
 
@@ -225,8 +254,82 @@ function handleTaskSubmit(e) {
     updateStats();
 }
 
+function sortTasks(tasks) {
+    const sortBy = document.getElementById('sort-by').value;
+    const sortOrder = document.getElementById('sort-order').value;
+    
+    const sorted = [...tasks];
+    
+    switch(sortBy) {
+        case 'date':
+            sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            break;
+        case 'priority':
+            const priorityOrder = { high: 1, medium: 2, low: 3 };
+            sorted.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+            break;
+        case 'title':
+            sorted.sort((a, b) => a.title.localeCompare(b.title));
+            break;
+        case 'deadline':
+            sorted.sort((a, b) => {
+                if (!a.deadline && !b.deadline) return 0;
+                if (!a.deadline) return 1;
+                if (!b.deadline) return -1;
+                return new Date(a.deadline) - new Date(b.deadline);
+            });
+            break;
+        default:
+            sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
+    
+    if (sortOrder === 'desc') {
+        sorted.reverse();
+    }
+    
+    return sorted;
+}
+
+function getFilteredTasks() {
+    let tasks = taskManager.getTasks();
+    
+    // Фильтр по статусу
+    const statusFilter = document.getElementById('status-filter').value;
+    if (statusFilter === 'active') {
+        tasks = tasks.filter(t => !t.completed);
+    } else if (statusFilter === 'completed') {
+        tasks = tasks.filter(t => t.completed);
+    }
+    
+    // Фильтр по категории
+    const categoryFilter = document.getElementById('category-filter').value;
+    if (categoryFilter !== 'all') {
+        tasks = tasks.filter(t => t.category === categoryFilter);
+    }
+    
+    // Фильтр по приоритету
+    const priorityFilter = document.getElementById('priority-filter').value;
+    if (priorityFilter !== 'all') {
+        tasks = tasks.filter(t => t.priority === priorityFilter);
+    }
+    
+    // Поиск
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    if (searchTerm) {
+        tasks = tasks.filter(t => 
+            t.title.toLowerCase().includes(searchTerm) ||
+            (t.description && t.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    // Сортировка
+    tasks = sortTasks(tasks);
+    
+    return tasks;
+}
+
 function renderTasks() {
-    const tasks = taskManager.getTasks();
+    const tasks = getFilteredTasks();
     const container = document.getElementById('tasks-list');
     
     if (tasks.length === 0) {
@@ -245,6 +348,7 @@ function renderTasks() {
                     <span>📁 ${getCategoryName(task.category)}</span>
                     <span class="priority-${task.priority}">${getPriorityIcon(task.priority)} ${getPriorityName(task.priority)}</span>
                     ${task.deadline ? `<span>📅 ${task.deadline}</span>` : ''}
+                    <span>${task.completed ? '✅ Выполнено' : '🟡 В работе'}</span>
                 </div>
             </div>
             <div class="task-actions">
@@ -299,59 +403,6 @@ function updateStats() {
             <div class="stat-label">Высокий приоритет</div>
         </div>
     `;
-}
-
-function filterTasks() {
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const categoryFilter = document.getElementById('category-filter').value;
-    const priorityFilter = document.getElementById('priority-filter').value;
-    
-    let filtered = taskManager.getTasks();
-    
-    if (searchTerm) {
-        filtered = filtered.filter(t => 
-            t.title.toLowerCase().includes(searchTerm) ||
-            (t.description && t.description.toLowerCase().includes(searchTerm))
-        );
-    }
-    
-    if (categoryFilter !== 'all') {
-        filtered = filtered.filter(t => t.category === categoryFilter);
-    }
-    
-    if (priorityFilter !== 'all') {
-        filtered = filtered.filter(t => t.priority === priorityFilter);
-    }
-    
-    const container = document.getElementById('tasks-list');
-    
-    if (filtered.length === 0) {
-        container.innerHTML = '<p style="color: white; text-align: center; padding: 2rem;">🔍 Ничего не найдено</p>';
-        return;
-    }
-    
-    container.innerHTML = filtered.map(task => `
-        <div class="task-card">
-            <div class="task-info">
-                <div class="task-title ${task.completed ? 'completed' : ''}">
-                    ${escapeHtml(task.title)}
-                </div>
-                ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
-                <div class="task-meta">
-                    <span>📁 ${getCategoryName(task.category)}</span>
-                    <span class="priority-${task.priority}">${getPriorityIcon(task.priority)} ${getPriorityName(task.priority)}</span>
-                    ${task.deadline ? `<span>📅 ${task.deadline}</span>` : ''}
-                </div>
-            </div>
-            <div class="task-actions">
-                <button class="complete-btn" onclick="toggleComplete(${task.id})">
-                    ${task.completed ? '↩️ Вернуть' : '✅ Выполнить'}
-                </button>
-                <button class="edit-btn" onclick="openEditModal(${task.id})">✏️</button>
-                <button class="delete-btn" onclick="deleteTask(${task.id})">🗑️</button>
-            </div>
-        </div>
-    `).join('');
 }
 
 function setupThemeToggle() {
